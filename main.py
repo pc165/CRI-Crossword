@@ -1,7 +1,6 @@
 from operator import truediv
 import numpy as np
 import copy as cp
-from scipy.sparse import dok_matrix
 from time import time
 from functools import partial
 
@@ -107,7 +106,7 @@ def findSharedLetters(horizontal, vertical):
     )
 
     dim = (len(horizontal), len(vertical))
-    sharedLetterGraph = dok_matrix(dim, dtype=structure)
+    sharedLetterGraph = np.empty(dim, dtype=structure)
 
     for i, ival in enumerate(horizontal):
         for j, jval in enumerate(vertical):
@@ -121,11 +120,13 @@ def findSharedLetters(horizontal, vertical):
             # intersection of the words (shared letter)
             p = intersection(*p1, *p2)
 
-            if p is not None:
+            if p is None:
+                sharedLetterGraph[i][j] = (-1, -1, "")
+            else:
                 # find the index of the letter by substracting the start of the word to the point
                 x = p[1] - ival[0][1]
                 y = p[0] - jval[0][0]
-                sharedLetterGraph[i, j] = (x, y, "-")
+                sharedLetterGraph[i][j] = (x, y, "-")
 
     return sharedLetterGraph
 
@@ -154,30 +155,29 @@ def order(var, graph, dic):
 
     if vertical:
         graph = graph.T
-    row = graph[pos].values()
+    row = graph[pos]
     count = 0
     for *_, i in row:
-        count += i == "-"
+        if i == "-":
+            count += 1
     return -lengh, -count, -len(dic[lengh])
 
 
 def backtracking(crossword, wordDict: dict):
     def meetsRequirements(word, crossword, var):
         varsArr, graph, mat = crossword
-        *_, vertical, pos = var
+        *_, direction, row = var
         # if the word is vertical transpose the matrix
-        if vertical:
+        if direction:
             graph = graph.T
 
-        row = graph[pos]
-
         # search if there are any letter mismatch
-        for x, y, letter in row.values():
-
-            if letter == "-":
+        row = graph[row]
+        for x, y, letter in row:
+            if x == -1 or letter == "" or letter == "-":
                 continue
 
-            idx = x if not vertical else y
+            idx = x if not direction else y
 
             if word[idx] != letter:
                 return False
@@ -200,9 +200,12 @@ def backtracking(crossword, wordDict: dict):
         varsArr = varsArr[1:]
 
         # update graph
-        for (_, column), (x, y, _) in graph[pos].items():
+        for i, val in enumerate(graph[pos]):
+            x, y, _ = val
+            if x == -1:
+                continue
             idx = x if not vertical else y
-            graph[pos, column] = (x, y, word[idx])
+            graph[pos, i] = (x, y, word[idx])
 
         # update dictionary
         wordArray = wordDict[lengh]
