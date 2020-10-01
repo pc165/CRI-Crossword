@@ -3,12 +3,13 @@ import numpy as np
 import copy as cp
 from scipy.sparse import dok_matrix
 from time import time
+from functools import partial
 
 
 def readFile():
     # with open("crossword_CB_v2.txt", "r") as f, open("diccionari_CB_v2.txt") as f2:
-    with open("crossword_CB_v2.txt", "r") as f, open("diccionari_A.txt") as f2:
-        # with open("crossword_A_v2.txt", "r") as f, open("diccionari_A.txt") as f2:
+    # with open("crossword_CB_v2.txt", "r") as f, open("diccionari_A.txt") as f2:
+    with open("crossword_A_v2.txt", "r") as f, open("diccionari_A.txt") as f2:
         crossword = f.readlines()
         words = f2.readlines()
 
@@ -136,11 +137,11 @@ def filterWordList(wordsList, horizontal, vertical):
 
     for _, lengh, *_ in horizontal + vertical:
         if lengh not in wordDict:
-            wordDict[lengh] = np.empty((0,), dtype=str)
+            wordDict[lengh] = []
 
     for word in wordsList:
         if len(word) in wordDict:
-            wordDict[len(word)] = np.append(wordDict[len(word)], word)
+            wordDict[len(word)].append(word)
 
     for i in wordDict.keys():
         wordDict[i] = np.array(wordDict[i], dtype=str)
@@ -148,17 +149,16 @@ def filterWordList(wordsList, horizontal, vertical):
     return wordDict
 
 
-def createVarArray(horizontal, vertical, graph):
-    def order(var, graph):
-        point, lengh, vertical, pos = var
-        if vertical:
-            graph = graph.T
-        row = graph[pos]
-        return -len(row), -lengh
+def order(var, graph, dic):
+    _, lengh, vertical, pos = var
 
-    varArr = horizontal + vertical
-    varArr.sort(key=lambda x: order(x, graph))
-    return varArr
+    if vertical:
+        graph = graph.T
+    row = graph[pos].values()
+    count = 0
+    for *_, i in row:
+        count += i == "-"
+    return -lengh, -count, -len(dic[lengh])
 
 
 def backtracking(crossword, wordDict: dict):
@@ -233,22 +233,21 @@ def backtracking(crossword, wordDict: dict):
 
     def updateDomain(crossword, wordDict):
         newWordDict = {}
+        pMeetsReq = partial(meetsRequirements, crossword=crossword)
         for var in crossword[0]:
-            if var[1] in newWordDict:
-                wordArr = newWordDict[var[1]]
-            else:
-                wordArr = []
-
-            for word in wordDict[var[1]]:
-                if meetsRequirements(word, crossword, var):
-                    wordArr.append(word)
-
-            if wordArr == []:
+            pF = partial(pMeetsReq, var=var)
+            vF = np.vectorize(pF)
+            wordArr = wordDict[var[1]]
+            idx = vF(wordArr)
+            if idx.any() == False:
                 return None
 
             if var[1] not in newWordDict:
-                newWordDict[var[1]] = wordArr
-
+                newWordDict[var[1]] = idx
+            else:
+                newWordDict[var[1]] = np.logical_or(newWordDict[var[1]], idx)
+        for i in newWordDict.keys():
+            newWordDict[i] = wordDict[i][newWordDict[i]]
         return newWordDict
 
     vars = crossword[0]
@@ -260,7 +259,7 @@ def backtracking(crossword, wordDict: dict):
     wordlist = wordDict[first[1]]
 
     for word in wordlist:
-        print(f"{first} {word} {meetsRequirements(word, crossword, first)}\n")
+        print(f"{first} {word} {meetsRequirements(word,crossword, first)}\n")
         if not meetsRequirements(word, crossword, first):
             continue
 
@@ -270,7 +269,7 @@ def backtracking(crossword, wordDict: dict):
         if newWordDict is None:
             print("skip")
             continue
-        newCrossword[0].sort(key=lambda x: len(wordDict[x[1]]))
+        newCrossword[0].sort(key=lambda x: order(x, newCrossword[1], newWordDict))
 
         res = backtracking(newCrossword, newWordDict)
         if isCompleted(res):
@@ -284,7 +283,8 @@ if __name__ == "__main__":
     horizontal, vertical = findWords(crosswordMat)
     sharedLetterGraph = findSharedLetters(horizontal, vertical)
     wordDict = filterWordList(words, horizontal, vertical)
-    varArr = createVarArray(horizontal, vertical, sharedLetterGraph)
+    varArr = horizontal + vertical
+    varArr.sort(key=lambda x: order(x, sharedLetterGraph, wordDict))
     crossword = varArr, sharedLetterGraph, crosswordMat
 
     start_time = time()
