@@ -1,0 +1,11 @@
+prova2.py
+.idea/.gitignore
+.idea/misc.xml
+.idea/modules.xml
+.idea/Practica.iml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/inspectionProfiles/Project_Default.xml
+__pycache__/util.cpython-38.pyc
+.vscode/settings.json
+.ipynb_checkpoints/main-checkpoint.ipynb
+__pycache__/main.cpython-38.pyc
