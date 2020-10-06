@@ -5,6 +5,8 @@ import copy as cp
 from time import time
 from functools import partial
 
+from numpy.core.fromnumeric import compress
+
 
 def readFile():
     # with open("crossword_CB_v2.txt", "r") as f, open("diccionari_CB_v2.txt") as f2:
@@ -62,7 +64,13 @@ def findWords(crosswordMat):
                     if vertical:  # translate the index of the transposed matrix
                         start[0], start[1] = start[1], start[0]
                     listVar.append(
-                        [start, length, vertical, len(listVar), copy(wordDict[length])]
+                        [
+                            start,
+                            length,
+                            vertical,
+                            len(listVar),
+                            np.ones(len(wordDict[length]), dtype=bool),
+                        ]
                     )
                 length = 1
                 start = row
@@ -72,7 +80,13 @@ def findWords(crosswordMat):
             if vertical:  # translate the index of the transposed matrix
                 start[0], start[1] = start[1], start[0]
             listVar.append(
-                [start, length, vertical, len(listVar), copy(wordDict[length])]
+                [
+                    start,
+                    length,
+                    vertical,
+                    len(listVar),
+                    np.ones(len(wordDict[length]), dtype=bool),
+                ]
             )
 
         return listVar
@@ -81,7 +95,7 @@ def findWords(crosswordMat):
     horizontal = findlengh(crosswordMat)
     vertical = findlengh(crosswordMat.transpose(), True)
 
-    return horizontal, vertical
+    return horizontal, vertical, wordDict
 
 
 def findSharedLetters(horizontal, vertical):
@@ -170,7 +184,7 @@ def order(var, graph):
     return -count
 
 
-def backtracking(crossword):
+def backtracking(crossword, wordDic):
     def meetsRequirements(word, crossword, var):
         varsArr, graph, (mat, wordsInMat) = crossword
         point, length, direction, row, wordlist = var
@@ -217,10 +231,6 @@ def backtracking(crossword):
             idx = x if not vertical else y
             graph[pos, i] = (x, y, word[idx])
 
-        # update dictionary
-        wordlist = wordlist[wordlist != word]
-        var[4] = wordlist
-
         # Fill the matrix
         x, y = point
         idx = x if not vertical else y
@@ -244,7 +254,7 @@ def backtracking(crossword):
         res = (mat == "0").any()
         return not res
 
-    def updateDomain(crossword, var):
+    def updateDomain(crossword, var, wordDic):
         def findModifiedRestrictions(graph):
             if vertical:
                 graph = graph.T
@@ -263,15 +273,16 @@ def backtracking(crossword):
 
         pMeetsReq = partial(meetsRequirements, crossword=crossword)
         varArr = crossword[0]
+
         for i, var2 in enumerate(varArr):
-            point2, length2, vertical2, pos2, wordlist2 = var2
+            point2, length2, vertical2, pos2, _ = var2
             if pos2 in lst and vertical2 != vertical:
                 pF = partial(pMeetsReq, var=var2)
                 vF = np.vectorize(pF)
-                idx = vF(wordlist2)
+                idx = vF(wordDic[length2])
                 if idx.any() == False:
                     return None
-                varArr[i][4] = wordlist2[idx]
+                varArr[i][4] = idx
         return crossword
 
     vars = crossword[0]
@@ -279,22 +290,20 @@ def backtracking(crossword):
     if len(vars) == 0:
         return crossword
 
-    vars.sort(key=lambda x: order(x, crossword[1]))
     first = vars[0]
-    wordlist = first[4]
+    wordbool = first[4]
 
-    for word in wordlist:
+    for word in compress(wordbool, wordDic[first[1]]):
         if meetsRequirements(word, crossword, first):
             newCrossword = updateVariables(word, crossword, first)
             print(newCrossword[2][0], "\n")
             print(newCrossword[2][1], "\n")
-
-            newCrossword = updateDomain(newCrossword, first)
-
+            newCrossword = updateDomain(newCrossword, first, wordDic)
             if newCrossword is None:
                 continue
 
-            res = backtracking(newCrossword)
+            newCrossword[0].sort(key=lambda x: order(x, crossword[1]))
+            res = backtracking(newCrossword, wordDic)
             if isCompleted(res):
                 return res
 
@@ -303,13 +312,14 @@ def backtracking(crossword):
 
 if __name__ == "__main__":
     words, crosswordMat = readFile()
-    horizontal, vertical = findWords(crosswordMat)
+    horizontal, vertical, wordDic = findWords(crosswordMat)
     sharedLetterGraph = findSharedLetters(horizontal, vertical)
     varArr = horizontal + vertical
+    varArr.sort(key=lambda x: order(x, sharedLetterGraph))
     crossword = varArr, sharedLetterGraph, (crosswordMat, [])
 
     start_time = time()
-    res = backtracking(crossword)
+    res = backtracking(crossword, wordDic)
     elapsed_time = time() - start_time
     print(elapsed_time)
     print(res[2])
