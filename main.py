@@ -161,9 +161,9 @@ def order(var, graph):
     row = graph[pos]
     count = 0
     for *_, i in row:
-        if i == "-":
+        if i != "-" and i != "":
             count += 1
-    return -count, -len(wordlist)
+    return -count
 
 
 def backtracking(crossword):
@@ -261,7 +261,7 @@ def backtracking(crossword):
         varArr = crossword[0]
         for i, var2 in enumerate(varArr):
             point2, length2, vertical2, pos2, wordlist2 = var2
-            if pos2 in lst and vertical2 != vertical or length2 == length:
+            if pos2 in lst and vertical2 != vertical:
                 pF = partial(pMeetsReq, var=var2)
                 vF = np.vectorize(pF)
                 idx = vF(wordlist2)
@@ -291,7 +291,7 @@ def backtracking(crossword):
                 print("skip")
                 continue
 
-            # newCrossword[0].sort(key=lambda x: order(x, newCrossword[1]))
+            newCrossword[0].sort(key=lambda x: order(x, newCrossword[1]))
 
             res = backtracking(newCrossword)
             if isCompleted(res):
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     horizontal, vertical = findWords(crosswordMat)
     sharedLetterGraph = findSharedLetters(horizontal, vertical)
     varArr = horizontal + vertical
-    # varArr.sort(key=lambda x: order(x, sharedLetterGraph))
+    varArr.sort(key=lambda x: order(x, sharedLetterGraph))
     crossword = varArr, sharedLetterGraph, (crosswordMat, [])
 
     start_time = time()
