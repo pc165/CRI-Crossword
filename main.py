@@ -98,6 +98,10 @@ def findSharedLetters(horizontal, vertical):
 
         Returns the intersection point or None if doesn't exist
         """
+
+        # solve:
+        # y = ax + b
+        # y = cx + d
         da = a2 - a1
         db = b2 - b1
         dp = a1 - b1
@@ -275,11 +279,11 @@ def backtracking(crossword):
     if len(vars) == 0:
         return crossword
 
+    vars.sort(key=lambda x: order(x, crossword[1]))
     first = vars[0]
     wordlist = first[4]
 
     for word in wordlist:
-        # print(f"{first} {word} {meetsRequirements(word,crossword, first)}\n")
         if meetsRequirements(word, crossword, first):
             newCrossword = updateVariables(word, crossword, first)
             print(newCrossword[2][0], "\n")
@@ -288,10 +292,7 @@ def backtracking(crossword):
             newCrossword = updateDomain(newCrossword, first)
 
             if newCrossword is None:
-                print("skip")
                 continue
-
-            newCrossword[0].sort(key=lambda x: order(x, newCrossword[1]))
 
             res = backtracking(newCrossword)
             if isCompleted(res):
@@ -305,7 +306,6 @@ if __name__ == "__main__":
     horizontal, vertical = findWords(crosswordMat)
     sharedLetterGraph = findSharedLetters(horizontal, vertical)
     varArr = horizontal + vertical
-    varArr.sort(key=lambda x: order(x, sharedLetterGraph))
     crossword = varArr, sharedLetterGraph, (crosswordMat, [])
 
     start_time = time()
